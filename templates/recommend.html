@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Recommend – EcoPackAI{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-title">📦 Packaging Recommendation</div>
+  <div class="page-sub">Fill in your product details to get AI-powered packaging suggestions.</div>
+
+  {% if error %}
+  <div class="alert alert-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="recommend-layout">
+
+    <!-- ── Input Form ── -->
+    <div class="card">
+      <div class="card-title">Product Details</div>
+      <form method="POST" action="{{ url_for('recommend') }}" id="recommend-form" novalidate>
+
+        <div class="form-group">
+          <label for="product_category">Product Category</label>
+          <select id="product_category" name="product_category" class="form-control" required>
+            <option value="">-- Select Category --</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}" {% if form.get('product_category') == cat %}selected{% endif %}>
+              {{ cat }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="product_weight">Product Weight (kg)</label>
+            <input type="number" id="product_weight" name="product_weight"
+                   class="form-control" placeholder="e.g. 2.5"
+                   step="0.01" min="0.01"
+                   value="{{ form.get('product_weight','') }}" required/>
+          </div>
+          <div class="form-group">
+            <label for="fragility">Fragility Level</label>
+            <select id="fragility" name="fragility" class="form-control" required>
+              <option value="">-- Select --</option>
+              {% for f in ['Low','Medium','High'] %}
+              <option value="{{ f }}" {% if form.get('fragility') == f %}selected{% endif %}>{{ f }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="shipping_distance">Shipping Distance (km)</label>
+          <input type="number" id="shipping_distance" name="shipping_distance"
+                 class="form-control" placeholder="e.g. 500"
+                 step="1" min="0"
+                 value="{{ form.get('shipping_distance','') }}" required/>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="durability_score">Durability Score (0–100)</label>
+            <input type="number" id="durability_score" name="durability_score"
+                   class="form-control" placeholder="e.g. 75"
+                   step="1" min="0" max="100"
+                   value="{{ form.get('durability_score','') }}" required/>
+          </div>
+          <div class="form-group">
+            <label for="biodegradability_score">Biodegradability (0–1)</label>
+            <input type="number" id="biodegradability_score" name="biodegradability_score"
+                   class="form-control" placeholder="e.g. 0.8"
+                   step="0.01" min="0" max="1"
+                   value="{{ form.get('biodegradability_score','') }}" required/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="recyclability_percent">Recyclability (%)</label>
+            <input type="number" id="recyclability_percent" name="recyclability_percent"
+                   class="form-control" placeholder="e.g. 80"
+                   step="0.1" min="0" max="100"
+                   value="{{ form.get('recyclability_percent','') }}" required/>
+          </div>
+          <div class="form-group">
+            <label for="co2_emission_score">CO₂ Emission Score</label>
+            <input type="number" id="co2_emission_score" name="co2_emission_score"
+                   class="form-control" placeholder="e.g. 0.5"
+                   step="0.01" min="0"
+                   value="{{ form.get('co2_emission_score','') }}" required/>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" style="margin-top:8px;">
+          🚀 Get Recommendation
+        </button>
+      </form>
+    </div>
+
+    <!-- ── Results ── -->
+    <div>
+      {% if result %}
+      <div class="result-section">
+
+        <!-- Summary -->
+        <div class="result-header">✅ Recommendation Results</div>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-label">Predicted Cost</div>
+            <div class="summary-value">₹{{ result.predicted_cost_inr }}</div>
+            <div class="summary-unit">per unit</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">CO₂ Score</div>
+            <div class="summary-value">{{ result.predicted_co2 }}</div>
+            <div class="summary-unit">emission index</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Sustainability</div>
+            <div class="summary-value">{{ result.sustainability_score }}</div>
+            <div class="summary-unit">out of 100</div>
+          </div>
+        </div>
+
+        <!-- Top 3 materials -->
+        <div class="result-header" style="margin-top:20px;">🏆 Top 3 Materials</div>
+        <div class="material-cards">
+          {% for m in result.top3 %}
+          <div class="material-card rank-{{ loop.index }}">
+            <div class="rank-badge">{{ loop.index }}</div>
+            <div class="material-info">
+              <div class="material-name">{{ m.material_name }}</div>
+              <span class="material-type">{{ m.type }}</span>
+              <div class="material-stats">
+                <div class="stat-item">Strength: <strong>{{ m.strength_score }}</strong></div>
+                <div class="stat-item">Cost: <strong>₹{{ (m.cost_per_unit * 83) | round(2) }}</strong></div>
+                <div class="stat-item">CO₂: <strong>{{ m.co2_emission_score }}</strong></div>
+                <div class="stat-item">Sustainability: <strong>{{ m.sustainability_score }}</strong></div>
+              </div>
+              <div class="progress-wrap" style="margin-top:10px;">
+                <div class="progress-label">
+                  <span>Biodegradability</span>
+                  <span>{{ (m.biodegradability_score * 100) | round(0) | int }}%</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill"
+                       data-width="{{ (m.biodegradability_score * 100) | round(0) | int }}"
+                       style="width:0%"></div>
+                </div>
+              </div>
+              <div class="progress-wrap" style="margin-top:6px;">
+                <div class="progress-label">
+                  <span>Recyclability</span>
+                  <span>{{ m.recyclability_percentage | round(0) | int }}%</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill"
+                       data-width="{{ m.recyclability_percentage | round(0) | int }}"
+                       style="width:0%;background:#43a047aa"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+      </div>
+      {% else %}
+      <div class="card" style="text-align:center;padding:48px 24px;color:var(--gray);">
+        <div style="font-size:3rem;margin-bottom:12px;">📦</div>
+        <div style="font-size:1rem;font-weight:600;margin-bottom:6px;">No results yet</div>
+        <div style="font-size:0.88rem;">Fill in the form and click <strong>Get Recommendation</strong>.</div>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

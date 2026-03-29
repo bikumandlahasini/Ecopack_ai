@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Analytics – EcoPackAI{% endblock %}
+
+{% block body %}
+<div class="layout">
+  {% include "_sidebar.html" %}
+  <div class="main-content">
+    {% include "_topbar.html" %}
+    <div class="page-body">
+
+      <div id="analytics-alert" class="alert hidden"></div>
+
+      <!-- Charts row -->
+      <div class="grid-2 mb-4">
+        <div class="card">
+          <div class="section-title">🌍 Avg CO₂ by Material Type</div>
+          <div class="chart-container">
+            <canvas id="co2Chart"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title">💰 Avg Cost by Material Type</div>
+          <div class="chart-container">
+            <canvas id="costChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-4">
+        <div class="card">
+          <div class="section-title">♻️ Avg Recyclability by Type</div>
+          <div class="chart-container">
+            <canvas id="recycleChart"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title">🌱 Top 10 Sustainable Materials</div>
+          <div class="chart-container">
+            <canvas id="topSusChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent predictions table -->
+      <div class="card">
+        <div class="section-title">🕒 Recent Predictions</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Recommended Material</th>
+                <th>Predicted Cost</th>
+                <th>CO₂ Score</th>
+                <th>Sustainability</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="predictions-tbody">
+              <tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const COLORS = ['#2ecc71','#3498db','#e74c3c','#f39c12','#9b59b6'];
+const GRID_COLOR = '#2a3a5c';
+const TICK_COLOR = '#8892a4';
+
+function makeBarChart(id, labels, values, label, color) {
+  const ctx = document.getElementById(id).getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label, data: values, backgroundColor: color, borderRadius: 6 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#e0e0e0' } } },
+      scales: {
+        x: { ticks: { color: TICK_COLOR }, grid: { color: GRID_COLOR } },
+        y: { ticks: { color: TICK_COLOR }, grid: { color: GRID_COLOR } },
+      }
+    }
+  });
+}
+
+(async () => {
+  try {
+    const data = await apiGet('/api/analytics');
+    if (data.error) {
+      showAlert('analytics-alert', data.error, 'error');
+      return;
+    }
+
+    const byType = data.by_type || [];
+    const types  = byType.map(d => d.type);
+
+    makeBarChart('co2Chart',     types, byType.map(d=>parseFloat(d.avg_co2)),     'Avg CO₂',          'rgba(231,76,60,0.75)');
+    makeBarChart('costChart',    types, byType.map(d=>parseFloat(d.avg_cost)),    'Avg Cost ($)',      'rgba(52,152,219,0.75)');
+    makeBarChart('recycleChart', types, byType.map(d=>parseFloat(d.avg_recycle)), 'Avg Recyclability %','rgba(46,204,113,0.75)');
+
+    // Top sustainable materials – horizontal bar
+    const topMats = data.top_materials || [];
+    const ctxTop  = document.getElementById('topSusChart').getContext('2d');
+    new Chart(ctxTop, {
+      type: 'bar',
+      data: {
+        labels: topMats.map(m => m.material_name.substring(0,18)+'…'),
+        datasets: [{
+          label: 'Sustainability Score',
+          data: topMats.map(m => parseFloat(m.sustainability_score)),
+          backgroundColor: 'rgba(155,89,182,0.75)',
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#e0e0e0' } } },
+        scales: {
+          x: { ticks: { color: TICK_COLOR }, grid: { color: GRID_COLOR } },
+          y: { ticks: { color: TICK_COLOR, font:{size:10} }, grid: { color: GRID_COLOR } },
+        }
+      }
+    });
+
+    // Recent predictions table
+    const tbody = document.getElementById('predictions-tbody');
+    const recent = data.recent_predictions || [];
+    if (recent.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px;">No predictions yet. Use the Recommendation page.</td></tr>';
+    } else {
+      tbody.innerHTML = recent.map(r => `
+        <tr>
+          <td>${r.product_name}</td>
+          <td>${r.recommended_material}</td>
+          <td class="text-success">$${r.predicted_cost}</td>
+          <td class="text-warning">${r.predicted_co2}</td>
+          <td class="text-muted">${r.sustainability_score}</td>
+          <td class="text-muted">${r.created_at}</td>
+        </tr>
+      `).join('');
+    }
+  } catch(e) {
+    showAlert('analytics-alert', 'Failed to load analytics: ' + e.message, 'error');
+  }
+})();
+</script>
+{% endblock %}

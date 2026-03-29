@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – EcoPackAI{% endblock %}
+
+{% block body %}
+<div class="layout">
+  {% include "_sidebar.html" %}
+  <div class="main-content">
+    {% include "_topbar.html" %}
+    <div class="page-body">
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="card">
+          <div class="card-title">Total Materials</div>
+          <div class="card-value">{{ stats.materials }}</div>
+          <div class="card-sub">In database</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Products</div>
+          <div class="card-value">{{ stats.products }}</div>
+          <div class="card-sub">Registered</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Predictions Made</div>
+          <div class="card-value">{{ stats.predictions }}</div>
+          <div class="card-sub">All time</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Avg CO₂ Score</div>
+          <div class="card-value" style="color:var(--warning)">{{ stats.avg_co2 }}</div>
+          <div class="card-sub">Across predictions</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Avg Predicted Cost</div>
+          <div class="card-value" style="color:var(--secondary)">{{ stats.avg_cost }}</div>
+          <div class="card-sub">Per unit ($)</div>
+        </div>
+      </div>
+
+      <!-- Model metrics + chart row -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="section-title">🤖 ML Model Performance</div>
+          {% if metrics %}
+          <div style="margin-bottom:16px;">
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-muted">Random Forest (Cost) R²</span>
+              <strong class="text-success">{{ metrics.rf_r2 }}</strong>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:{{ (metrics.rf_r2 * 100)|round }}%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-muted">XGBoost (CO₂) R²</span>
+              <strong class="text-success">{{ metrics.xgb_r2 }}</strong>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:{{ (metrics.xgb_r2 * 100)|round }}%;background:var(--secondary)"></div>
+            </div>
+          </div>
+          {% else %}
+          <p class="text-muted">Models not yet trained. Run train_models.py.</p>
+          {% endif %}
+
+          <div class="mt-6">
+            <div class="section-title">📦 Quick Actions</div>
+            <div class="flex gap-2" style="flex-wrap:wrap;">
+              <a href="/recommend" class="btn btn-primary">🔍 Get Recommendation</a>
+              <a href="/analytics" class="btn btn-secondary">📊 Analytics</a>
+              <a href="/admin" class="btn" style="background:var(--dark3);color:var(--text);">⚙️ Admin</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">📊 Material Type Distribution</div>
+          <div class="chart-container">
+            <canvas id="typeChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(async () => {
+  try {
+    const data = await apiGet('/api/analytics');
+    if (data.error) return;
+    const byType = data.by_type || [];
+    const ctx = document.getElementById('typeChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: byType.map(d => d.type),
+        datasets: [{
+          data: byType.map(d => parseFloat(d.avg_co2)),
+          backgroundColor: ['#2ecc71','#3498db','#e74c3c','#f39c12','#9b59b6'],
+          borderWidth: 2,
+          borderColor: '#1e2a45',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#e0e0e0', font: { size: 12 } } },
+          tooltip: { callbacks: { label: ctx => ` Avg CO₂: ${ctx.parsed}` } }
+        }
+      }
+    });
+  } catch(e) { console.error(e); }
+})();
+</script>
+{% endblock %}

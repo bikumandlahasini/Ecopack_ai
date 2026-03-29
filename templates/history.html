@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}History – EcoPackAI{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-title">📋 Recommendation History</div>
+  <div class="page-sub">Your past packaging recommendations.</div>
+
+  {% if rows %}
+  <div class="history-grid">
+    {% for row in rows %}
+    <div class="history-card">
+      <div class="history-card-header">
+        <div class="history-category">{{ row.product_category }}</div>
+        <div class="history-date">
+          {{ row.created_at.strftime('%d %b %Y, %I:%M %p') if row.created_at else '—' }}
+        </div>
+      </div>
+
+      <div class="history-meta">
+        <span class="meta-chip">⚖️ {{ row.product_weight }} kg</span>
+        <span class="meta-chip">🔺 {{ row.fragility }}</span>
+        <span class="meta-chip">🚚 {{ row.shipping_distance | int }} km</span>
+        <span class="meta-chip">♻️ {{ row.recyclability_percent }}%</span>
+        <span class="meta-chip">🌱 Bio {{ row.biodegradability_score }}</span>
+      </div>
+
+      <div style="font-size:0.82rem;color:var(--gray);margin-bottom:8px;font-weight:600;">
+        Recommended Materials:
+      </div>
+      <div class="history-materials">
+        {% if row.rec_material_1 %}
+        <span class="mat-chip top">🥇 {{ row.rec_material_1 }}</span>
+        {% endif %}
+        {% if row.rec_material_2 %}
+        <span class="mat-chip">🥈 {{ row.rec_material_2 }}</span>
+        {% endif %}
+        {% if row.rec_material_3 %}
+        <span class="mat-chip">🥉 {{ row.rec_material_3 }}</span>
+        {% endif %}
+      </div>
+
+      <div class="history-cost">
+        Predicted Cost: <strong>₹{{ row.predicted_cost }}</strong>
+        &nbsp;|&nbsp; Sustainability: <strong>{{ row.sustainability_score }}</strong>/100
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="history-empty">
+    <div class="icon">📭</div>
+    <div style="font-size:1rem;font-weight:600;margin-bottom:6px;">No history yet</div>
+    <div style="font-size:0.88rem;">
+      Go to <a href="{{ url_for('recommend') }}">Recommendations</a> to get started.
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>EcoPackAI – Smart Packaging</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+<div class="landing">
+
+  <!-- Minimal nav -->
+  <nav class="navbar">
+    <span class="navbar-brand">🌿 EcoPackAI</span>
+    <ul class="navbar-links">
+      <li><a href="{{ url_for('login') }}" class="btn btn-outline" style="padding:8px 18px;">Login</a></li>
+      <li><a href="{{ url_for('signup') }}" class="btn btn-primary" style="padding:8px 18px;">Sign Up</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <div class="landing-hero">
+    <div class="landing-badge">🌱 AI-Powered Packaging Intelligence</div>
+    <h1 class="landing-title">
+      Smart Packaging for a<br/><span>Greener Planet</span>
+    </h1>
+    <p class="landing-sub">
+      EcoPackAI uses machine learning to recommend the most cost-effective
+      and sustainable packaging materials for your products.
+    </p>
+    <div class="landing-btns">
+      <a href="{{ url_for('signup') }}" class="btn btn-primary btn-lg">Get Started Free</a>
+      <a href="{{ url_for('login') }}" class="btn btn-outline btn-lg">Sign In</a>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="landing-features">
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h3>AI Recommendations</h3>
+      <p>Random Forest &amp; XGBoost models trained on 2000+ materials.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💰</div>
+      <h3>Cost Prediction</h3>
+      <p>Accurate cost estimates in Indian Rupees (₹) per unit.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">♻️</div>
+      <h3>Sustainability Score</h3>
+      <p>Evaluate biodegradability, recyclability and CO₂ impact.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📋</div>
+      <h3>Full History</h3>
+      <p>Track all your past recommendations in one place.</p>
+    </div>
+  </div>
+
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

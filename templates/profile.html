@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Profile – EcoPackAI{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-title">👤 My Profile</div>
+  <div class="page-sub">Your account information.</div>
+
+  <div class="profile-layout">
+
+    <!-- Avatar card -->
+    <div class="profile-avatar-card">
+      <div class="avatar-circle">
+        {{ user.name[0].upper() if user else '?' }}
+      </div>
+      <div class="profile-name">{{ user.name if user else '—' }}</div>
+      <div class="profile-email">{{ user.email if user else '—' }}</div>
+
+      <div class="profile-stat">
+        <div class="profile-stat-value">{{ rec_count }}</div>
+        <div class="profile-stat-label">Total Recommendations</div>
+      </div>
+
+      <a href="{{ url_for('recommend') }}" class="btn btn-primary btn-full" style="margin-top:20px;">
+        + New Recommendation
+      </a>
+      <a href="{{ url_for('logout') }}" class="btn btn-outline btn-full" style="margin-top:10px;">
+        Logout
+      </a>
+    </div>
+
+    <!-- Info card -->
+    <div class="profile-info-card">
+      <div class="card-title">Account Details</div>
+
+      <div class="info-row">
+        <div class="info-label">Full Name</div>
+        <div class="info-value">{{ user.name if user else '—' }}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Email</div>
+        <div class="info-value">{{ user.email if user else '—' }}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Phone</div>
+        <div class="info-value">{{ user.phone if user and user.phone else '—' }}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Recommendations</div>
+        <div class="info-value">{{ rec_count }} total</div>
+      </div>
+
+      <div style="margin-top:28px;">
+        <div class="card-title">Quick Links</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;">
+          <a href="{{ url_for('recommend') }}" class="btn btn-primary">📦 Recommend</a>
+          <a href="{{ url_for('history') }}" class="btn btn-outline">📋 History</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
