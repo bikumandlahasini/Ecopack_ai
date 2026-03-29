@@ -2,23 +2,13 @@ import psycopg2
 import psycopg2.extras
 import os
 import time
-from dotenv import load_dotenv
-
-load_dotenv()
-
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": int(os.getenv("DB_PORT", 5432)),
-    "dbname": os.getenv("DB_NAME", "eco_pack_ai"),
-    "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "postgres"),
-}
-
 
 def get_connection(retries=5, delay=2):
+    DATABASE_URL = os.environ.get("DATABASE_URL")
+
     for attempt in range(retries):
         try:
-            conn = psycopg2.connect(**DB_CONFIG)
+            conn = psycopg2.connect(DATABASE_URL)
             return conn
         except psycopg2.OperationalError as e:
             if attempt < retries - 1:
@@ -34,6 +24,7 @@ def get_cursor(conn):
 def init_db():
     conn = get_connection()
     cur = conn.cursor()
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -75,6 +66,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
+
     conn.commit()
     cur.close()
     conn.close()
