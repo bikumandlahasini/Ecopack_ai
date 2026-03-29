@@ -299,11 +299,14 @@ def profile():
 
 
 # ── run ───────────────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    startup()
+
+
 import os
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
 if __name__ == "__main__":
-    startup()
+    startup()   # ✅ ADD THIS LINE
+
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
