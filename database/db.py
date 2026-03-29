@@ -1,20 +1,16 @@
 import psycopg2
 import psycopg2.extras
 import os
-import time
 
-def get_connection(retries=5, delay=2):
-    DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-    for attempt in range(retries):
-        try:
-            conn = psycopg2.connect(DATABASE_URL)
-            return conn
-        except psycopg2.OperationalError as e:
-            if attempt < retries - 1:
-                time.sleep(delay)
-            else:
-                raise RuntimeError(f"DB connection failed: {e}")
+
+def get_connection():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL not set")
+
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
 
 
 def get_cursor(conn):
