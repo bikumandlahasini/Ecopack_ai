@@ -1,62 +1,73 @@
 {% extends "base.html" %}
-{% block title %}History – EcoPackAI{% endblock %}
-
+{% block title %}History — EcoPackAI{% endblock %}
 {% block content %}
-<div class="page-wrapper">
-  <div class="page-title">📋 Recommendation History</div>
-  <div class="page-sub">Your past packaging recommendations.</div>
+<div style="background:linear-gradient(135deg,#0d2b1a,#198754);padding:3rem 0 2rem;color:white;text-align:center">
+  <h2 style="font-weight:800;font-size:2rem">📋 Recommendation History</h2>
+  <p style="opacity:0.85">All your past packaging recommendations</p>
+</div>
 
+<div class="container py-5">
   {% if rows %}
-  <div class="history-grid">
-    {% for row in rows %}
-    <div class="history-card">
-      <div class="history-card-header">
-        <div class="history-category">{{ row.product_category }}</div>
-        <div class="history-date">
-          {{ row.created_at.strftime('%d %b %Y, %I:%M %p') if row.created_at else '—' }}
-        </div>
-      </div>
-
-      <div class="history-meta">
-        <span class="meta-chip">⚖️ {{ row.product_weight }} kg</span>
-        <span class="meta-chip">🔺 {{ row.fragility }}</span>
-        <span class="meta-chip">🚚 {{ row.shipping_distance | int }} km</span>
-        <span class="meta-chip">♻️ {{ row.recyclability_percent }}%</span>
-        <span class="meta-chip">🌱 Bio {{ row.biodegradability_score }}</span>
-      </div>
-
-      <div style="font-size:0.82rem;color:var(--gray);margin-bottom:8px;font-weight:600;">
-        Recommended Materials:
-      </div>
-      <div class="history-materials">
-        {% if row.rec_material_1 %}
-        <span class="mat-chip top">🥇 {{ row.rec_material_1 }}</span>
-        {% endif %}
-        {% if row.rec_material_2 %}
-        <span class="mat-chip">🥈 {{ row.rec_material_2 }}</span>
-        {% endif %}
-        {% if row.rec_material_3 %}
-        <span class="mat-chip">🥉 {{ row.rec_material_3 }}</span>
-        {% endif %}
-      </div>
-
-      <div class="history-cost">
-        Predicted Cost: <strong>₹{{ row.predicted_cost }}</strong>
-        &nbsp;|&nbsp; Sustainability: <strong>{{ row.sustainability_score }}</strong>/100
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-clock-history me-2"></i>Your Recommendations ({{ rows|length }})</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Category</th>
+              <th>Weight</th>
+              <th>Fragility</th>
+              <th>Top Material</th>
+              <th>Cost (₹)</th>
+              <th>Sustainability</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td><span class="badge-eco">{{ r.product_category }}</span></td>
+              <td>{{ r.product_weight }} kg</td>
+              <td>{{ r.fragility }}</td>
+              <td class="fw-600">{{ r.rec_material_1 or '—' }}</td>
+              <td>₹{{ r.predicted_cost or '—' }}</td>
+              <td>
+                {% if r.sustainability_score %}
+                  <div class="progress" style="width:80px">
+                    <div class="progress-bar" style="width:{{ [r.sustainability_score * 100, 100]|min }}%"></div>
+                  </div>
+                  <small class="text-muted">{{ r.sustainability_score }}</small>
+                {% else %}—{% endif %}
+              </td>
+              <td class="text-muted small">{{ r.created_at.strftime('%d %b %Y') if r.created_at else '—' }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('delete_history', rec_id=r.id) }}"
+                      onsubmit="return confirm('Delete this record?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
-    {% endfor %}
   </div>
-
   {% else %}
-  <div class="history-empty">
-    <div class="icon">📭</div>
-    <div style="font-size:1rem;font-weight:600;margin-bottom:6px;">No history yet</div>
-    <div style="font-size:0.88rem;">
-      Go to <a href="{{ url_for('recommend') }}">Recommendations</a> to get started.
-    </div>
+  <div class="card p-5 text-center" style="border:2px dashed #dee2e6">
+    <div style="font-size:4rem;margin-bottom:1rem">📭</div>
+    <h5 class="fw-700 text-muted">No recommendations yet</h5>
+    <p class="text-muted">Start by getting your first packaging recommendation.</p>
+    <a href="{{ url_for('recommend') }}" class="btn-eco mt-2">Get Recommendation</a>
   </div>
   {% endif %}
-
 </div>
 {% endblock %}

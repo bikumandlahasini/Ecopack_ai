@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Admin Login — EcoPackAI{% endblock %}
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h2>🛡️ Admin Panel</h2>
+      <p>EcoPackAI Administration</p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ 'success' if cat == 'success' else 'danger' }} mb-3">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-control" placeholder="admin" required>
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" placeholder="admin" required>
+      </div>
+      <button type="submit" class="btn-eco w-100" style="text-align:center">Login as Admin</button>
+    </form>
+    <p class="text-center mt-3 text-muted small">
+      <a href="{{ url_for('index') }}" style="color:var(--green)">← Back to Home</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

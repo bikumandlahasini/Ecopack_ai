@@ -1,7 +1,7 @@
-import os, sys
+import os, sys, math, logging
 from functools import wraps
 from flask import (Flask, render_template, request, redirect,
-                   url_for, session, jsonify, flash)
+                   url_for, session, flash, jsonify)
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 
@@ -14,11 +14,15 @@ from utils.model_loader import predict
 from utils.recommender import rank_materials
 from utils.validators import validate_signup, validate_login, validate_recommend
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "ecopackai_secret_2024")
 
-# ── INR conversion factor (1 USD ≈ 83 INR) ───────────────────────────────────
 INR = 83.0
+ADMIN_USER = "admin"
+ADMIN_PASS = "admin"
 
 CATEGORIES = [
     "Electronics", "Food & Beverage", "Pharmaceuticals", "Cosmetics",
@@ -38,6 +42,26 @@ def login_required(f):
     return decorated
 
 
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("is_admin"):
+            flash("Admin access required.", "error")
+            return redirect(url_for("admin_login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def safe_float(value, name):
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid value for {name}")
+    if math.isnan(v) or math.isinf(v):
+        raise ValueError(f"Invalid value for {name}")
+    return v
+
+
 def current_user():
     uid = session.get("user_id")
     if not uid:
@@ -49,7 +73,8 @@ def current_user():
         row = cur.fetchone()
         cur.close(); conn.close()
         return dict(row) if row else None
-    except Exception:
+    except Exception as e:
+        logger.exception("current_user error: %s", e)
         return None
 
 
@@ -60,23 +85,43 @@ def startup():
         print("✔ DB tables ready.")
     except Exception as e:
         print(f"✘ DB init error: {e}")
+        return
+
+    try:
+        conn = get_connection()
+        cur  = conn.cursor()
+        cur.execute("""
+            UPDATE materials
+            SET sustainability_score = ROUND(
+                (biodegradability_score * 0.4
+                + (recyclability_percentage / 100.0) * 0.4
+                + GREATEST(0, 1 - co2_emission_score / 3.0) * 0.2)::numeric, 4)
+            WHERE sustainability_score IS NULL
+        """)
+        fixed = cur.rowcount
+        conn.commit(); cur.close(); conn.close()
+        if fixed:
+            print(f"✔ Fixed sustainability_score for {fixed} rows.")
+    except Exception as e:
+        print(f"✘ Sustainability fix error: {e}")
 
     mat_csv = os.path.join(BASE_DIR, "datasets", "materials.csv")
-    if not os.path.exists(mat_csv):
-        print("Dataset missing — generating...")
-        try:
-            from datasets.generate_datasets import generate_materials, save_csv, insert_materials
-            df = generate_materials(2000)
+    try:
+        import pandas as pd
+        from datasets.generate_datasets import generate_materials, save_csv, insert_materials
+        if not os.path.exists(mat_csv):
+            df = generate_materials(5000)
             save_csv(df, "materials.csv")
-            insert_materials(df)
-            print("✔ Dataset generated.")
-        except Exception as e:
-            print(f"✘ Dataset error: {e}")
+        else:
+            df = pd.read_csv(mat_csv)
+        insert_materials(df)
+        print("✔ Materials loaded.")
+    except Exception as e:
+        print(f"✘ Dataset error: {e}")
 
     cost_pkl = os.path.join(BASE_DIR, "models", "cost_model.pkl")
     co2_pkl  = os.path.join(BASE_DIR, "models", "co2_model.pkl")
     if not os.path.exists(cost_pkl) or not os.path.exists(co2_pkl):
-        print("Models missing — training...")
         try:
             from models.train_models import train
             train()
@@ -85,17 +130,15 @@ def startup():
             print(f"✘ Training error: {e}")
     else:
         try:
-            predict("Paper", 50, 10.0, 0.8, 70.0)
+            predict("Bioplastic", 50, 10.0, 0.8, 70.0)
             print("✔ Models loaded.")
         except Exception as e:
             print(f"✘ Model load error: {e}")
 
 
-# ── landing ───────────────────────────────────────────────────────────────────
+# ── public pages ──────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    if session.get("user_id"):
-        return redirect(url_for("recommend"))
     return render_template("index.html")
 
 
@@ -115,7 +158,7 @@ def signup():
             cur  = conn.cursor()
             cur.execute("SELECT id FROM users WHERE email=%s", (data["email"].strip(),))
             if cur.fetchone():
-                flash("Email already registered. Please log in.", "error")
+                flash("Email already registered.", "error")
                 cur.close(); conn.close()
                 return render_template("signup.html", form=data)
             pwd_hash = generate_password_hash(data["password"])
@@ -131,6 +174,7 @@ def signup():
             flash("Account created! Welcome to EcoPackAI 🌿", "success")
             return redirect(url_for("recommend"))
         except Exception as e:
+            logger.exception("Signup error: %s", e)
             flash(f"Registration failed: {e}", "error")
             return render_template("signup.html", form=data)
     return render_template("signup.html", form={})
@@ -160,6 +204,7 @@ def login():
             session["user_name"] = user["name"]
             return redirect(url_for("recommend"))
         except Exception as e:
+            logger.exception("Login error: %s", e)
             flash(f"Login failed: {e}", "error")
             return render_template("login.html", form=data)
     return render_template("login.html", form={})
@@ -177,10 +222,10 @@ def logout():
 @app.route("/recommend", methods=["GET", "POST"])
 @login_required
 def recommend():
-    user    = current_user()
-    result  = None
-    form    = {}
-    error   = None
+    user   = current_user()
+    result = None
+    form   = {}
+    error  = None
 
     if request.method == "POST":
         form = request.form.to_dict()
@@ -189,13 +234,12 @@ def recommend():
             error = msg
         else:
             try:
-                weight   = float(form["product_weight"])
+                weight    = safe_float(form["product_weight"], "product_weight")
                 fragility = form["fragility"]
-                bio_inp  = float(form["biodegradability_score"])
-                rec_inp  = float(form["recyclability_percent"])
-                co2_inp  = float(form["co2_emission_score"])
+                bio_inp   = safe_float(form["biodegradability_score"], "biodegradability_score")
+                rec_inp   = safe_float(form["recyclability_percent"], "recyclability_percent")
+                co2_inp   = safe_float(form["co2_emission_score"], "co2_emission_score")
 
-                # Fetch materials from DB
                 conn = get_connection()
                 cur  = get_cursor(conn)
                 cur.execute("SELECT * FROM materials LIMIT 500")
@@ -203,27 +247,27 @@ def recommend():
                 cur.close(); conn.close()
 
                 if not materials:
-                    error = "No materials in database. Run generate_datasets.py first."
+                    error = "No materials in database."
                 else:
                     ranked = rank_materials(materials, weight, fragility)
                     top3   = ranked[:3]
+                    top    = top3[0]
 
-                    # ML predictions for top material
-                    top = top3[0]
                     pred_cost_usd, pred_co2 = predict(
                         top["type"], top["strength_score"], top["weight_capacity"],
                         top["biodegradability_score"], top["recyclability_percentage"]
                     )
                     pred_cost_inr = round(pred_cost_usd * INR, 2)
+                    co2_reduction = round(max(0, (1 - pred_co2 / max(co2_inp, 0.01)) * 100), 1)
 
                     result = {
                         "top3": top3,
                         "predicted_cost_inr": pred_cost_inr,
                         "predicted_co2": pred_co2,
                         "sustainability_score": top["sustainability_score"],
+                        "co2_reduction": co2_reduction,
                     }
 
-                    # Save to history
                     try:
                         conn = get_connection()
                         cur  = conn.cursor()
@@ -238,8 +282,8 @@ def recommend():
                         """, (
                             session["user_id"],
                             form["product_category"], weight, fragility,
-                            float(form["shipping_distance"]),
-                            float(form["durability_score"]),
+                            safe_float(form["shipping_distance"], "shipping_distance"),
+                            safe_float(form["durability_score"], "durability_score"),
                             bio_inp, rec_inp, co2_inp,
                             top3[0]["material_name"],
                             top3[1]["material_name"] if len(top3) > 1 else None,
@@ -248,9 +292,12 @@ def recommend():
                         ))
                         conn.commit(); cur.close(); conn.close()
                     except Exception as e:
-                        print(f"History save error: {e}")
+                        logger.exception("History save error: %s", e)
 
+            except ValueError as e:
+                error = str(e)
             except Exception as e:
+                logger.exception("Recommendation error: %s", e)
                 error = f"Recommendation failed: {e}"
 
     return render_template("recommend.html",
@@ -262,51 +309,131 @@ def recommend():
 @app.route("/history")
 @login_required
 def history():
-    user  = current_user()
-    rows  = []
+    user = current_user()
+    rows = []
     try:
         conn = get_connection()
         cur  = get_cursor(conn)
         cur.execute("""
-            SELECT * FROM history
-            WHERE user_id=%s
-            ORDER BY created_at DESC
-            LIMIT 50
+            SELECT * FROM history WHERE user_id=%s
+            ORDER BY created_at DESC LIMIT 50
         """, (session["user_id"],))
         rows = [dict(r) for r in cur.fetchall()]
         cur.close(); conn.close()
     except Exception as e:
+        logger.exception("History load error: %s", e)
         flash(f"Could not load history: {e}", "error")
     return render_template("history.html", user=user, rows=rows)
+
+
+@app.route("/history/delete/<int:rec_id>", methods=["POST"])
+@login_required
+def delete_history(rec_id):
+    try:
+        conn = get_connection()
+        cur  = conn.cursor()
+        cur.execute("DELETE FROM history WHERE id=%s AND user_id=%s",
+                    (rec_id, session["user_id"]))
+        conn.commit(); cur.close(); conn.close()
+        flash("Record deleted.", "success")
+    except Exception as e:
+        logger.exception("Delete history error: %s", e)
+        flash("Could not delete record.", "error")
+    return redirect(url_for("history"))
 
 
 # ── profile ───────────────────────────────────────────────────────────────────
 @app.route("/profile")
 @login_required
 def profile():
-    user = current_user()
+    user  = current_user()
     count = 0
     try:
-        conn = get_connection()
-        cur  = get_cursor(conn)
+        conn  = get_connection()
+        cur   = get_cursor(conn)
         cur.execute("SELECT COUNT(*) AS cnt FROM history WHERE user_id=%s",
                     (session["user_id"],))
         count = cur.fetchone()["cnt"]
         cur.close(); conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception("Profile load error: %s", e)
     return render_template("profile.html", user=user, rec_count=count)
 
 
+# ── admin login ───────────────────────────────────────────────────────────────
+@app.route("/admin", methods=["GET", "POST"])
+def admin_login():
+    if session.get("is_admin"):
+        return redirect(url_for("admin_dashboard"))
+    if request.method == "POST":
+        u = request.form.get("username", "")
+        p = request.form.get("password", "")
+        if u == ADMIN_USER and p == ADMIN_PASS:
+            session["is_admin"] = True
+            return redirect(url_for("admin_dashboard"))
+        flash("Invalid admin credentials.", "error")
+    return render_template("admin_login.html")
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("is_admin", None)
+    return redirect(url_for("admin_login"))
+
+
+# ── admin dashboard ───────────────────────────────────────────────────────────
+@app.route("/admin/dashboard")
+@admin_required
+def admin_dashboard():
+    stats = {}
+    try:
+        conn = get_connection()
+        cur  = get_cursor(conn)
+
+        cur.execute("SELECT COUNT(*) AS cnt FROM users")
+        stats["total_users"] = cur.fetchone()["cnt"]
+
+        cur.execute("SELECT COUNT(*) AS cnt FROM history")
+        stats["total_recs"] = cur.fetchone()["cnt"]
+
+        cur.execute("SELECT AVG(co2_emission_score) AS avg FROM history")
+        row = cur.fetchone()
+        stats["avg_co2"] = round(row["avg"] or 0, 2)
+
+        cur.execute("""
+            SELECT rec_material_1 AS mat, COUNT(*) AS cnt
+            FROM history WHERE rec_material_1 IS NOT NULL
+            GROUP BY rec_material_1 ORDER BY cnt DESC LIMIT 5
+        """)
+        stats["top_materials"] = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("""
+            SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+            FROM history
+            WHERE created_at >= NOW() - INTERVAL '7 days'
+            GROUP BY day ORDER BY day
+        """)
+        stats["last7"] = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("""
+            SELECT id, name, email, phone, created_at FROM users
+            ORDER BY created_at DESC LIMIT 50
+        """)
+        stats["users"] = [dict(r) for r in cur.fetchall()]
+
+        cur.close(); conn.close()
+    except Exception as e:
+        logger.exception("Admin dashboard error: %s", e)
+        flash(f"Dashboard error: {e}", "error")
+
+    return render_template("admin_dashboard.html", stats=stats)
+
+
 # ── run ───────────────────────────────────────────────────────────────────────
-
-
-import os
-
-DATABASE_URL = os.environ.get("DATABASE_URL")
+startup()
 
 if __name__ == "__main__":
-    startup()   # ✅ ADD THIS LINE
-
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    port  = int(os.environ.get("PORT", 5000))
+    debug = os.getenv("FLASK_ENV") == "development"
+    host  = "127.0.0.1" if debug else "0.0.0.0"
+    app.run(host=host, port=port, debug=debug)

@@ -1,17 +1,18 @@
-print("🔥 FILE STARTED")
 import psycopg2
 import psycopg2.extras
 import os
+from dotenv import load_dotenv
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 
 def get_connection():
-    if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL not set")
-
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL not set — check your .env file")
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    return psycopg2.connect(url)
 
 
 def get_cursor(conn):
@@ -20,7 +21,7 @@ def get_cursor(conn):
 
 def init_db():
     conn = get_connection()
-    cur = conn.cursor()
+    cur  = conn.cursor()
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -30,8 +31,10 @@ def init_db():
             phone VARCHAR(20),
             password_hash VARCHAR(256) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
+    """)
 
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS materials (
             material_id SERIAL PRIMARY KEY,
             material_name VARCHAR(120) UNIQUE NOT NULL,
@@ -41,9 +44,18 @@ def init_db():
             cost_per_unit FLOAT,
             biodegradability_score FLOAT,
             co2_emission_score FLOAT,
-            recyclability_percentage FLOAT
-        );
+            recyclability_percentage FLOAT,
+            sustainability_score FLOAT
+        )
+    """)
 
+    # Add column if table existed before sustainability_score was introduced
+    cur.execute("""
+        ALTER TABLE materials
+        ADD COLUMN IF NOT EXISTS sustainability_score FLOAT
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id SERIAL PRIMARY KEY,
             user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -61,7 +73,7 @@ def init_db():
             predicted_cost FLOAT,
             sustainability_score FLOAT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
     """)
 
     conn.commit()

@@ -1,64 +1,206 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>EcoPackAI – Smart Packaging</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
-</head>
-<body>
-<div class="landing">
+{% extends "base.html" %}
+{% block title %}EcoPackAI — Smart Eco Packaging{% endblock %}
+{% block content %}
 
-  <!-- Minimal nav -->
-  <nav class="navbar">
-    <span class="navbar-brand">🌿 EcoPackAI</span>
-    <ul class="navbar-links">
-      <li><a href="{{ url_for('login') }}" class="btn btn-outline" style="padding:8px 18px;">Login</a></li>
-      <li><a href="{{ url_for('signup') }}" class="btn btn-primary" style="padding:8px 18px;">Sign Up</a></li>
-    </ul>
-  </nav>
-
-  <!-- Hero -->
-  <div class="landing-hero">
-    <div class="landing-badge">🌱 AI-Powered Packaging Intelligence</div>
-    <h1 class="landing-title">
-      Smart Packaging for a<br/><span>Greener Planet</span>
-    </h1>
-    <p class="landing-sub">
-      EcoPackAI uses machine learning to recommend the most cost-effective
-      and sustainable packaging materials for your products.
-    </p>
-    <div class="landing-btns">
-      <a href="{{ url_for('signup') }}" class="btn btn-primary btn-lg">Get Started Free</a>
-      <a href="{{ url_for('login') }}" class="btn btn-outline btn-lg">Sign In</a>
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">🌱 AI-Powered Sustainable Packaging</div>
+    <h1>Smart Packaging<br>for a Greener Planet</h1>
+    <p>Use machine learning to find the most eco-friendly, cost-effective packaging for your products.</p>
+    <div class="d-flex gap-3 justify-content-center flex-wrap">
+      <a href="{{ url_for('signup') }}" class="btn-eco" style="font-size:1.05rem;padding:0.75rem 2rem">
+        Get Started Free <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+      <a href="#features" class="btn-outline-eco" style="color:white;border-color:white;font-size:1.05rem;padding:0.75rem 2rem">
+        Learn More
+      </a>
     </div>
   </div>
+</section>
 
-  <!-- Features -->
-  <div class="landing-features">
-    <div class="feature-card">
-      <div class="feature-icon">🤖</div>
-      <h3>AI Recommendations</h3>
-      <p>Random Forest &amp; XGBoost models trained on 2000+ materials.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">💰</div>
-      <h3>Cost Prediction</h3>
-      <p>Accurate cost estimates in Indian Rupees (₹) per unit.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">♻️</div>
-      <h3>Sustainability Score</h3>
-      <p>Evaluate biodegradability, recyclability and CO₂ impact.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📋</div>
-      <h3>Full History</h3>
-      <p>Track all your past recommendations in one place.</p>
+<!-- STATS STRIP -->
+<section style="background:var(--white);padding:2rem 0;border-bottom:1px solid #eee">
+  <div class="container">
+    <div class="row text-center g-3">
+      <div class="col-6 col-md-3">
+        <div class="fw-800" style="font-size:2rem;font-weight:800;color:var(--green)">5000+</div>
+        <div class="text-muted small">Eco Materials</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div style="font-size:2rem;font-weight:800;color:var(--green)">2</div>
+        <div class="text-muted small">ML Models</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div style="font-size:2rem;font-weight:800;color:var(--green)">90%+</div>
+        <div class="text-muted small">Accuracy</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div style="font-size:2rem;font-weight:800;color:var(--green)">100%</div>
+        <div class="text-muted small">Eco Focused</div>
+      </div>
     </div>
   </div>
+</section>
 
-</div>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+<!-- FEATURES -->
+<section id="features" style="padding:5rem 0;background:var(--gray-bg)">
+  <div class="container text-center">
+    <div class="section-title">Why EcoPackAI?</div>
+    <div class="title-line"></div>
+    <p class="section-subtitle">Powered by machine learning to make packaging smarter and greener</p>
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="card p-4 h-100 text-center">
+          <div class="feature-icon">🤖</div>
+          <h5 class="fw-700 mb-2">Machine Learning</h5>
+          <p class="text-muted">Random Forest models trained on 5000+ eco materials to predict cost and CO₂ with 90%+ accuracy.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-4 h-100 text-center">
+          <div class="feature-icon">🌿</div>
+          <h5 class="fw-700 mb-2">Eco Friendly</h5>
+          <p class="text-muted">Every recommendation prioritizes biodegradability, recyclability, and carbon footprint reduction.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-4 h-100 text-center">
+          <div class="feature-icon">📊</div>
+          <h5 class="fw-700 mb-2">Smart Analytics</h5>
+          <p class="text-muted">Track your packaging history, sustainability scores, and CO₂ reduction over time.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-4 h-100 text-center">
+          <div class="feature-icon">💰</div>
+          <h5 class="fw-700 mb-2">Cost Prediction</h5>
+          <p class="text-muted">Get accurate cost estimates in Indian Rupees before committing to any packaging material.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-4 h-100 text-center">
+          <div class="feature-icon">🔒</div>
+          <h5 class="fw-700 mb-2">Secure & Private</h5>
+          <p class="text-muted">Your data is protected with hashed passwords and secure PostgreSQL storage.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-4 h-100 text-center">
+          <div class="feature-icon">☁️</div>
+          <h5 class="fw-700 mb-2">Cloud Ready</h5>
+          <p class="text-muted">Deployed on Render with full PostgreSQL support. Works locally and in production.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section style="padding:5rem 0;background:var(--white)">
+  <div class="container text-center">
+    <div class="section-title">How It Works</div>
+    <div class="title-line"></div>
+    <p class="section-subtitle">Three simple steps to smarter packaging</p>
+    <div class="row g-4 justify-content-center">
+      <div class="col-md-4">
+        <div style="font-size:3rem;margin-bottom:1rem">📝</div>
+        <div style="background:var(--green);color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;margin:0 auto 1rem">1</div>
+        <h6 class="fw-700">Enter Product Details</h6>
+        <p class="text-muted small">Fill in weight, fragility, category, and sustainability preferences.</p>
+      </div>
+      <div class="col-md-4">
+        <div style="font-size:3rem;margin-bottom:1rem">🤖</div>
+        <div style="background:var(--green);color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;margin:0 auto 1rem">2</div>
+        <h6 class="fw-700">AI Analyzes</h6>
+        <p class="text-muted small">Our ML models rank 500+ materials by sustainability and cost.</p>
+      </div>
+      <div class="col-md-4">
+        <div style="font-size:3rem;margin-bottom:1rem">✅</div>
+        <div style="background:var(--green);color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;margin:0 auto 1rem">3</div>
+        <h6 class="fw-700">Get Top 3 Results</h6>
+        <p class="text-muted small">Receive ranked recommendations with cost, CO₂, and sustainability scores.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about" style="padding:5rem 0;background:var(--gray-bg)">
+  <div class="container">
+    <div class="row align-items-center g-5">
+      <div class="col-md-6">
+        <div class="section-title">About EcoPackAI</div>
+        <div class="title-line" style="margin:0.5rem 0 1rem"></div>
+        <p class="text-muted mb-3">EcoPackAI is an AI-powered packaging recommendation system built to help businesses make smarter, greener packaging decisions.</p>
+        <p class="text-muted mb-3">Using Random Forest machine learning models trained on thousands of eco-friendly materials, we predict cost and carbon emissions to help you choose the best option.</p>
+        <ul class="list-unstyled">
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>20+ real eco-friendly material types</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>R² accuracy above 0.85</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Cost shown in Indian Rupees (₹)</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Full recommendation history</li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <div class="card p-4" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7)">
+          <h5 class="fw-700 mb-3" style="color:var(--green)">🌍 Environmental Impact</h5>
+          <div class="mb-3">
+            <div class="d-flex justify-content-between mb-1"><span class="small fw-600">Biodegradability Focus</span><span class="small">95%</span></div>
+            <div class="progress"><div class="progress-bar" style="width:95%"></div></div>
+          </div>
+          <div class="mb-3">
+            <div class="d-flex justify-content-between mb-1"><span class="small fw-600">CO₂ Reduction</span><span class="small">88%</span></div>
+            <div class="progress"><div class="progress-bar" style="width:88%"></div></div>
+          </div>
+          <div class="mb-3">
+            <div class="d-flex justify-content-between mb-1"><span class="small fw-600">Recyclability</span><span class="small">92%</span></div>
+            <div class="progress"><div class="progress-bar" style="width:92%"></div></div>
+          </div>
+          <div>
+            <div class="d-flex justify-content-between mb-1"><span class="small fw-600">Cost Efficiency</span><span class="small">85%</span></div>
+            <div class="progress"><div class="progress-bar" style="width:85%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact" style="padding:5rem 0;background:var(--white)">
+  <div class="container text-center">
+    <div class="section-title">Get In Touch</div>
+    <div class="title-line"></div>
+    <p class="section-subtitle">Have questions? We'd love to hear from you.</p>
+    <div class="row justify-content-center g-4">
+      <div class="col-md-3">
+        <div class="card p-4 text-center">
+          <div style="font-size:2rem;margin-bottom:0.5rem">📧</div>
+          <h6 class="fw-700">Email</h6>
+          <p class="text-muted small">info@ecopackai.com</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card p-4 text-center">
+          <div style="font-size:2rem;margin-bottom:0.5rem">📍</div>
+          <h6 class="fw-700">Location</h6>
+          <p class="text-muted small">India</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card p-4 text-center">
+          <div style="font-size:2rem;margin-bottom:0.5rem">💬</div>
+          <h6 class="fw-700">Support</h6>
+          <p class="text-muted small">support@ecopackai.com</p>
+        </div>
+      </div>
+    </div>
+    <div class="mt-4">
+      <a href="{{ url_for('signup') }}" class="btn-eco" style="font-size:1.05rem;padding:0.75rem 2.5rem">
+        Start Free Today <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
