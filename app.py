@@ -382,51 +382,265 @@ def admin_logout():
 
 
 # ── admin dashboard ───────────────────────────────────────────────────────────
+def _get_admin_stats():
+    """Fetch all admin stats in one place — reused by dashboard and exports."""
+    stats = {}
+    conn = get_connection()
+    cur  = get_cursor(conn)
+
+    cur.execute("SELECT COUNT(*) AS cnt FROM users")
+    stats["total_users"] = cur.fetchone()["cnt"]
+
+    cur.execute("SELECT COUNT(*) AS cnt FROM history")
+    stats["total_recs"] = cur.fetchone()["cnt"]
+
+    cur.execute("SELECT AVG(co2_emission_score) AS avg FROM history")
+    stats["avg_co2"] = round((cur.fetchone()["avg"] or 0), 2)
+
+    cur.execute("SELECT AVG(sustainability_score) AS avg FROM history")
+    stats["avg_sus"] = round((cur.fetchone()["avg"] or 0), 2)
+
+    cur.execute("SELECT AVG(predicted_cost) AS avg FROM history")
+    avg_eco_cost = cur.fetchone()["avg"] or 0
+    BASELINE_COST_INR = 350.0
+    stats["avg_cost_saving"] = round(max(0, BASELINE_COST_INR - avg_eco_cost), 2)
+    stats["cost_saving_pct"] = round(max(0, (BASELINE_COST_INR - avg_eco_cost) / BASELINE_COST_INR * 100), 1)
+
+    cur.execute("""
+        SELECT AVG(co2_emission_score) AS avg_co2 FROM history
+    """)
+    avg_co2_val = cur.fetchone()["avg_co2"] or 0
+    BASELINE_CO2 = 2.5
+    stats["co2_reduction_pct"] = round(max(0, (BASELINE_CO2 - avg_co2_val) / BASELINE_CO2 * 100), 1)
+
+    cur.execute("""
+        SELECT rec_material_1 AS mat, COUNT(*) AS cnt
+        FROM history WHERE rec_material_1 IS NOT NULL
+        GROUP BY rec_material_1 ORDER BY cnt DESC LIMIT 5
+    """)
+    stats["top_materials"] = [dict(r) for r in cur.fetchall()]
+    stats["top_material"] = stats["top_materials"][0]["mat"] if stats["top_materials"] else "—"
+
+    cur.execute("""
+        SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+        FROM history
+        WHERE created_at >= NOW() - INTERVAL '7 days'
+        GROUP BY day ORDER BY day
+    """)
+    stats["last7"] = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT DATE(created_at) AS day, AVG(predicted_cost) AS avg_cost
+        FROM history
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY day ORDER BY day
+    """)
+    stats["cost_trend"] = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT DATE(created_at) AS day, AVG(co2_emission_score) AS avg_co2
+        FROM history
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY day ORDER BY day
+    """)
+    stats["co2_trend"] = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT DATE(created_at) AS day, AVG(sustainability_score) AS avg_sus
+        FROM history
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY day ORDER BY day
+    """)
+    stats["sus_trend"] = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT id, name, email, phone, created_at FROM users
+        ORDER BY created_at DESC LIMIT 50
+    """)
+    stats["users"] = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT id, user_id, product_category, product_weight, fragility,
+               rec_material_1, predicted_cost, sustainability_score, co2_emission_score, created_at
+        FROM history ORDER BY created_at DESC LIMIT 200
+    """)
+    stats["history_rows"] = [dict(r) for r in cur.fetchall()]
+
+    cur.close(); conn.close()
+    return stats
+
+
 @app.route("/admin/dashboard")
 @admin_required
 def admin_dashboard():
     stats = {}
     try:
-        conn = get_connection()
-        cur  = get_cursor(conn)
-
-        cur.execute("SELECT COUNT(*) AS cnt FROM users")
-        stats["total_users"] = cur.fetchone()["cnt"]
-
-        cur.execute("SELECT COUNT(*) AS cnt FROM history")
-        stats["total_recs"] = cur.fetchone()["cnt"]
-
-        cur.execute("SELECT AVG(co2_emission_score) AS avg FROM history")
-        row = cur.fetchone()
-        stats["avg_co2"] = round(row["avg"] or 0, 2)
-
-        cur.execute("""
-            SELECT rec_material_1 AS mat, COUNT(*) AS cnt
-            FROM history WHERE rec_material_1 IS NOT NULL
-            GROUP BY rec_material_1 ORDER BY cnt DESC LIMIT 5
-        """)
-        stats["top_materials"] = [dict(r) for r in cur.fetchall()]
-
-        cur.execute("""
-            SELECT DATE(created_at) AS day, COUNT(*) AS cnt
-            FROM history
-            WHERE created_at >= NOW() - INTERVAL '7 days'
-            GROUP BY day ORDER BY day
-        """)
-        stats["last7"] = [dict(r) for r in cur.fetchall()]
-
-        cur.execute("""
-            SELECT id, name, email, phone, created_at FROM users
-            ORDER BY created_at DESC LIMIT 50
-        """)
-        stats["users"] = [dict(r) for r in cur.fetchall()]
-
-        cur.close(); conn.close()
+        stats = _get_admin_stats()
     except Exception as e:
         logger.exception("Admin dashboard error: %s", e)
         flash(f"Dashboard error: {e}", "error")
-
     return render_template("admin_dashboard.html", stats=stats)
+
+
+# ── export PDF ────────────────────────────────────────────────────────────────
+@app.route("/admin/export/pdf")
+@admin_required
+def export_pdf():
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle, HRFlowable)
+    from reportlab.lib.units import cm
+    from io import BytesIO
+    from datetime import datetime
+    from flask import make_response
+
+    try:
+        stats = _get_admin_stats()
+    except Exception as e:
+        flash(f"PDF export error: {e}", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=2*cm, rightMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+    styles = getSampleStyleSheet()
+    GREEN  = colors.HexColor("#198754")
+    BLACK  = colors.HexColor("#111111")
+
+    title_style = ParagraphStyle("title", parent=styles["Title"],
+                                 textColor=GREEN, fontSize=22, spaceAfter=4)
+    h2_style    = ParagraphStyle("h2", parent=styles["Heading2"],
+                                 textColor=BLACK, fontSize=13, spaceBefore=14, spaceAfter=6)
+    body_style  = styles["Normal"]
+
+    elements = []
+    elements.append(Paragraph("🌿 EcoPackAI — Sustainability Report", title_style))
+    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%d %B %Y, %H:%M')}", body_style))
+    elements.append(HRFlowable(width="100%", thickness=2, color=GREEN, spaceAfter=12))
+
+    # KPI Summary
+    elements.append(Paragraph("Key Performance Indicators", h2_style))
+    kpi_data = [
+        ["Metric", "Value"],
+        ["Total Users",            str(stats.get("total_users", 0))],
+        ["Total Recommendations",  str(stats.get("total_recs", 0))],
+        ["Avg Sustainability Score",str(stats.get("avg_sus", 0))],
+        ["Avg CO₂ Score",          str(stats.get("avg_co2", 0))],
+        ["CO₂ Reduction %",        f"{stats.get('co2_reduction_pct', 0)}%"],
+        ["Avg Cost Saving (₹)",    f"₹{stats.get('avg_cost_saving', 0)}"],
+        ["Cost Saving %",          f"{stats.get('cost_saving_pct', 0)}%"],
+        ["Top Material",           stats.get("top_material", "—")],
+    ]
+    kpi_table = Table(kpi_data, colWidths=[9*cm, 7*cm])
+    kpi_table.setStyle(TableStyle([
+        ("BACKGROUND",   (0,0), (-1,0), GREEN),
+        ("TEXTCOLOR",    (0,0), (-1,0), colors.white),
+        ("FONTNAME",     (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTSIZE",     (0,0), (-1,-1), 10),
+        ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white, colors.HexColor("#f0fdf4")]),
+        ("GRID",         (0,0), (-1,-1), 0.5, colors.HexColor("#dee2e6")),
+        ("PADDING",      (0,0), (-1,-1), 8),
+    ]))
+    elements.append(kpi_table)
+    elements.append(Spacer(1, 0.5*cm))
+
+    # Top Materials
+    elements.append(Paragraph("Top 5 Recommended Materials", h2_style))
+    mat_data = [["#", "Material Name", "Times Recommended"]]
+    for i, m in enumerate(stats.get("top_materials", []), 1):
+        mat_data.append([str(i), m["mat"], str(m["cnt"])])
+    if len(mat_data) > 1:
+        mat_table = Table(mat_data, colWidths=[1.5*cm, 11*cm, 4*cm])
+        mat_table.setStyle(TableStyle([
+            ("BACKGROUND",   (0,0), (-1,0), GREEN),
+            ("TEXTCOLOR",    (0,0), (-1,0), colors.white),
+            ("FONTNAME",     (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE",     (0,0), (-1,-1), 10),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white, colors.HexColor("#f0fdf4")]),
+            ("GRID",         (0,0), (-1,-1), 0.5, colors.HexColor("#dee2e6")),
+            ("PADDING",      (0,0), (-1,-1), 8),
+        ]))
+        elements.append(mat_table)
+
+    elements.append(Spacer(1, 0.5*cm))
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#dee2e6")))
+    elements.append(Spacer(1, 0.3*cm))
+    elements.append(Paragraph("EcoPackAI — AI-Powered Eco Packaging Recommendation System", body_style))
+
+    doc.build(elements)
+    buf.seek(0)
+    resp = make_response(buf.read())
+    resp.headers["Content-Type"]        = "application/pdf"
+    resp.headers["Content-Disposition"] = "attachment; filename=ecopackai_report.pdf"
+    return resp
+
+
+# ── export Excel ──────────────────────────────────────────────────────────────
+@app.route("/admin/export/excel")
+@admin_required
+def export_excel():
+    import pandas as pd
+    from io import BytesIO
+    from flask import make_response
+    from datetime import datetime
+
+    try:
+        stats = _get_admin_stats()
+    except Exception as e:
+        flash(f"Excel export error: {e}", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+
+        # Sheet 1 — KPI Summary
+        kpi_df = pd.DataFrame([
+            {"Metric": "Total Users",             "Value": stats.get("total_users", 0)},
+            {"Metric": "Total Recommendations",   "Value": stats.get("total_recs", 0)},
+            {"Metric": "Avg Sustainability Score", "Value": stats.get("avg_sus", 0)},
+            {"Metric": "Avg CO2 Score",            "Value": stats.get("avg_co2", 0)},
+            {"Metric": "CO2 Reduction %",          "Value": f"{stats.get('co2_reduction_pct',0)}%"},
+            {"Metric": "Avg Cost Saving INR",      "Value": stats.get("avg_cost_saving", 0)},
+            {"Metric": "Cost Saving %",            "Value": f"{stats.get('cost_saving_pct',0)}%"},
+            {"Metric": "Top Material",             "Value": stats.get("top_material", "—")},
+            {"Metric": "Report Generated",         "Value": datetime.now().strftime("%d %b %Y %H:%M")},
+        ])
+        kpi_df.to_excel(writer, sheet_name="KPI Summary", index=False)
+
+        # Sheet 2 — Recommendation History
+        if stats.get("history_rows"):
+            hist_df = pd.DataFrame(stats["history_rows"])
+            hist_df.to_excel(writer, sheet_name="Recommendation History", index=False)
+
+        # Sheet 3 — Top Materials
+        if stats.get("top_materials"):
+            mat_df = pd.DataFrame(stats["top_materials"])
+            mat_df.columns = ["Material Name", "Times Recommended"]
+            mat_df.to_excel(writer, sheet_name="Top Materials", index=False)
+
+        # Sheet 4 — Users
+        if stats.get("users"):
+            users_df = pd.DataFrame(stats["users"])[["id","name","email","phone","created_at"]]
+            users_df.to_excel(writer, sheet_name="Users", index=False)
+
+        # Sheet 5 — CO2 Trend
+        if stats.get("co2_trend"):
+            co2_df = pd.DataFrame(stats["co2_trend"])
+            co2_df.to_excel(writer, sheet_name="CO2 Trend", index=False)
+
+        # Sheet 6 — Cost Trend
+        if stats.get("cost_trend"):
+            cost_df = pd.DataFrame(stats["cost_trend"])
+            cost_df.to_excel(writer, sheet_name="Cost Trend", index=False)
+
+    buf.seek(0)
+    resp = make_response(buf.read())
+    resp.headers["Content-Type"]        = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    resp.headers["Content-Disposition"] = "attachment; filename=ecopackai_analytics.xlsx"
+    return resp
 
 
 # ── run ───────────────────────────────────────────────────────────────────────
